@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Launcher settings. Edit, then run launcher/build-and-install.sh.
+  Per-TV values can live in an overlay instead: launcher/build-and-install.ps1 -Overlay examples/<tv>/res
   Package names: tools/venv/bin/python -I tools/tv.py 'pm list packages'
 -->
 <resources>
@@ -11,6 +12,10 @@
         <item>in.startv.hotstar</item>
         <item>com.netflix.ninja</item>
         <item>com.amazon.amazonvideo.livingroom</item>
+    </string-array>
+
+    <!-- Shown first in the rows under the dock, in this order; every other app follows A-Z. -->
+    <string-array name="pinned_apps">
     </string-array>
 
     <!-- Never shown as tiles: system helpers, and the Live TV app (it's in the Inputs menu). -->

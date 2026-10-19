@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Vu GloLED Google TV overrides for launcher/res/values/config.xml.
+     Build with: launcher/build-and-install.ps1 -Overlay examples/vu-glo-google-tv/res -->
+<resources>
+    <string-array name="dock_apps">
+        <item>com.amazon.amazonvideo.livingroom</item>
+        <item>com.google.android.youtube.tv</item>
+        <item>in.startv.hotstar</item>
+        <item>com.stremio.one</item>
+        <item>com.graymatrix.did</item>
+    </string-array>
+
+    <string-array name="pinned_apps">
+        <item>tv.twitch.android.app</item>
+        <item>com.valvesoftware.steamlink</item>
+        <item>com.sonyliv</item>
+        <item>app.netmirror.newtv</item>
+        <item>com.android.vending</item>
+    </string-array>
+
+    <string-array name="hidden_apps">
+        <item>com.mediatek.wwtv.tvcenter</item>
+        <item>com.hisense.tv.protector</item>
+    </string-array>
+
+    <string name="live_tv_package" translatable="false">com.mediatek.wwtv.tvcenter</string>
+
+    <string name="input_picker_package" translatable="false">com.mediatek.wwtv.tvcenter</string>
+</resources>

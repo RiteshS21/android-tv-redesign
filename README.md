@@ -44,13 +44,28 @@ launcher/build-and-install.sh                               # build + install th
 
 Undo everything with `tools/restore.sh <the same list>`.
 
+## Do it by hand (Windows)
+
+Needs Python 3 and PowerShell 7 (`pwsh`). JDK 17 and the Android SDK (platform 34, build-tools 34.0.0)
+are looked for in `%USERPROFILE%	vhome-toolchain` (`jdk-17*` and `sdk\`), or set `JAVA_HOME` / `ANDROID_HOME`.
+
+```powershell
+python -m venv toolsenv; toolsenv\Scripts\pip install -r toolsequirements.txt
+"192.168.1.5" | Out-File -Encoding ascii -NoNewline tools\.tv_host   # your TV's IP
+toolsenv\Scripts\python -I tools	v.py --probe
+launcheruild-and-install.ps1 -Overlay examplesu-glo-google-tves   # -Overlay: your TV's config
+```
+
+Undo everything with `toolsestore.ps1 <debloat list>` (add `-RemoveLauncher` to uninstall it too).
+
 ## What's here
 
 | Path | What it is |
 |---|---|
 | [PROMPT.md](PROMPT.md) | The prompt for Claude Code / any coding agent |
-| [launcher/](launcher/) | The home screen. 4.7 MB including the wallpapers; plain Android, no network, no background services |
-| [launcher/res/values/config.xml](launcher/res/values/config.xml) | Dock apps, hidden apps, Live TV app, grid columns |
+| [launcher/](launcher/) | The home screen and its screensaver. 4.7 MB including the wallpapers; plain Android, no network |
+| [launcher/res/values/config.xml](launcher/res/values/config.xml) | Default dock apps, row order, hidden apps, Live TV app, grid columns |
+| [examples/*/res/](examples/vu-glo-google-tv/res/values/config.xml) | Per-TV overrides of that config, applied with `-Overlay` / `OVERLAY=` |
 | [tools/tv.py](tools/tv.py) | Pure-Python ADB client: shell, batch, screenshots, chunked APK push |
 | [tools/find-tv.sh](tools/find-tv.sh) | Finds Android TVs on your Wi-Fi |
 | [tools/type.sh](tools/type.sh) | Type into the TV's on-screen keyboard from your laptop (`tools/type.sh` alone prompts hidden, for passwords) |
@@ -59,17 +74,28 @@ Undo everything with `tools/restore.sh <the same list>`.
 
 ## The launcher
 
-- Clock, greeting and date top-left. Frosted pills top-right for **Inputs** (HDMI/AV/Live TV
-  dropdown; the remote's Menu key opens it too), **Wi-Fi** (shows the network name) and **Settings**.
-- A dock of your favourite apps. The focused app's name appears above it over a glow coloured from
-  its banner. Press Down for every other app in a grid.
-- 12 nature photos crossfade every 10 minutes, with a scrim so text stays readable. Swap them in
-  `launcher/assets/wallpapers/` (1920×1080 JPEGs, credits in `launcher/WALLPAPER-CREDITS.md`).
-- Deterministic D-pad focus, remembers the last tile, picks up newly installed apps on return.
+Laid out like tvOS: the photo fills the top half, the dock sits in a rounded glass tray, the rest of
+your apps follow in rows of wide icons over a frosted blur. Focus lifts an icon with a light sweep.
 
-Change the dock: edit `config.xml`, then run `launcher/build-and-install.sh`.
+- **Top-left**: greeting, clock and date. **Top-right**: a glass capsule with **Search** (Google
+  Assistant), **Inputs** (HDMI/AV/Live TV), **Wi-Fi** and **Settings**.
+- **Long-press OK on an app**: Move (arrow keys, OK to finish; drag in or out of the dock), Add to /
+  Remove from Dock, App info, Hide, Lock with PIN, Uninstall. The layout is remembered on the TV.
+- **Recently used** row (needs usage access, granted at install) and **Home Settings** at the bottom:
+  clock on/off, recent row, auto-switch to an HDMI input when its device turns on, wallpaper interval
+  and source (built-in and/or your photos in `Pictures/Wallpapers`, e.g. sent with LocalSend),
+  start the TV on an input, app-lock PIN, shelf darkness, hidden apps, reset order, free up memory.
+- **Aerial screensaver**: the photos drift slowly with a large clock; set as the TV's screensaver at install.
+- 12 nature photos (`launcher/assets/wallpapers/`, credits in `launcher/WALLPAPER-CREDITS.md`).
+
+The default dock comes from `config.xml`; once you rearrange apps on the TV, that layout wins
+(Home Settings › Reset app order goes back). App lock only applies to apps opened from this launcher.
 
 ## Gotchas we hit
+
+- **Hisense-made sets (Vu, some Toshiba) ignore `killBackgroundProcesses`** for third-party callers
+  ("Invalid packageName"), so Home Settings › Free up memory frees little there.
+- **The remote's Menu key opens the TV's own quick settings** on Vu/Hisense; use long-press OK for app options.
 
 - **macOS blocks the `adb` binary** on the local network ("No route to host"). `tools/tv.py` uses
   the `adb-shell` Python package instead.

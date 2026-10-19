@@ -1,0 +1,28 @@
+# Vu GloLED 43" Google TV (Hisense-built, device "songshan"), Android 11, build RTT2.220118.001
+# Apply: tools/disable.sh examples/vu-glo-google-tv/debloat.txt   Undo: tools/restore.sh <same file>
+# Everything is DISABLED for user 0, never uninstalled.
+# Answers here: keeps Chromecast, screen mirroring and Google Assistant; no USB/DLNA media.
+# Kept on purpose: firmware updates (hisense ota/remoteupgrade, vt usbota), HDMI/Live TV inputs
+# (hitvinput, vt.tv.input, mediatek tvcenter), Dolby, smartsense, customerlauncher (boot-time config).
+
+# Ads, promoted installs, demo mode
+android.autoinstalls.config.google.gtvpai   # silently installs promoted apps
+com.hisense.storemode                       # in-store demo mode
+fusion.android.tv.demo                      # demo app
+com.google.android.feedback
+
+# Vendor background clutter
+com.vt.tv.aiot                     # Vu IoT service, starts on boot
+com.hisense.udpserver              # Hisense phone sync-play discovery
+
+# USB / network media (not used)
+com.vt.tv.mediacenter              # USB media player
+com.hisense.tv.dlna                # DLNA media renderer
+
+# Google extras
+com.google.android.apps.tv.dreamx  # ambient screensaver with recommendations (~96 MB; falls back to basic)
+com.google.android.videos          # Google TV / Play Movies
+com.google.android.youtube.tvmusic # YouTube Music
+
+# Preinstalled apps not used
+tv.airtel.xstream.tvapp

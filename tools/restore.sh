@@ -8,11 +8,13 @@ cd "$(dirname "$0")/.."
 LIST="${1:?usage: tools/restore.sh <debloat list>}"
 PY="${PY:-tools/venv/bin/python}"
 STOCK_LAUNCHER="${STOCK_LAUNCHER:-com.google.android.apps.tv.launcherx/.home.HomeActivity}"
+STOCK_SCREENSAVER="${STOCK_SCREENSAVER:-com.google.android.apps.tv.dreamx/.service.Backdrop}"
 {
   grep -vE '^\s*(#|$)' "$LIST" | awk '{print "pm enable " $1}'
   echo "pm enable com.google.android.tungsten.setupwraith"
   echo "pm enable ${STOCK_LAUNCHER%%/*}"
   echo "cmd package set-home-activity --user 0 $STOCK_LAUNCHER"
+  echo "settings put secure screensaver_components $STOCK_SCREENSAVER"
   echo "input keyevent KEYCODE_HOME"
 } | "$PY" -I tools/tv.py --batch
 echo "Restored. Press Home on the remote."
