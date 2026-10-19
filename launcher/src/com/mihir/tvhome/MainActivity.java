@@ -173,7 +173,7 @@ public class MainActivity extends Activity {
         // Catch installs/removals that happened while another app was in front.
         if (getPackageManager().getChangedPackages(packageSeq) != null) buildApps();
         if (firstShow) { firstShow = false; playEntrance(); }
-        else if (pref("auto_clean", false)) handler.postDelayed(() -> freeMemory(null), 2000);
+        if (CleanerService.isRunning()) CleanerService.abort();
         // New photo on return if the current one has been up for the full interval.
         long every = wallpaperInterval(), shown = SystemClock.elapsedRealtime() - wallChangedAt;
         if (wallIndex < 0 || (every > 0 && shown >= every)) nextWallpaper();
@@ -266,13 +266,14 @@ public class MainActivity extends Activity {
 
         // The dock sits in a rounded glass tray over the photo, like tvOS's top row.
         dockRow = row();
-        dockRow.setPadding(dp(16), dp(16), dp(16), dp(16));
+        // Side padding fits an end icon's 16% focus growth inside the glass, with room to spare.
+        dockRow.setPadding(dp(30), dp(18), dp(30), dp(18));
         GradientDrawable tray = new GradientDrawable();
         tray.setCornerRadius(dp(28));
         tray.setColor(0x38FFFFFF);
         tray.setStroke(Math.max(1, dp(0.5f)), 0x24FFFFFF);
         dockRow.setBackground(tray);
-        content.addView(dockRow, llp(-1, -2, dp(88), dp(10), dp(88), dp(34)));
+        content.addView(dockRow, llp(-1, -2, dp(74), dp(10), dp(74), dp(34)));
         dockRow.addOnLayoutChangeListener((v, l, t, r, b2, ol, ot, or, ob) -> positionFrost());
 
         grid = new LinearLayout(this);
@@ -792,6 +793,7 @@ public class MainActivity extends Activity {
 
     private void startMove(String pkg) {
         movingPkg = pkg;
+        hint.setText("◀ ▶ ▲ ▼  move     OK  done");
         hint.setVisibility(View.VISIBLE);
         hint.setAlpha(0f);
         hint.animate().alpha(1f).setDuration(200).start();
@@ -1140,34 +1142,58 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Greenify-style clean-up: ask Android to end the background processes of your apps (anything you can
-     * open from Home, plus anything you installed). TV services, the keyboard, Live TV and this launcher
-     * are left alone. Android does not let a normal app force-stop others; this is the allowed equivalent.
+     * Greenify-style clean-up: force-stop the apps you used in the last day (never this launcher, Live TV,
+     * the keyboard or Settings itself) through CleanerService, which presses Force stop in each app's
+     * App info page. The first time, it opens Settings › Accessibility so you can switch the service on.
      */
-    private void freeMemory(java.util.function.LongConsumer done) {
-        android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(ACTIVITY_SERVICE);
+    private void startCleanup() {
+        if (settingsPopup != null) settingsPopup.dismiss();
+        if (!CleanerService.isEnabled(this)) {
+            launch(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+            showHint("Turn on “Home: Free up memory”, then press Free up memory again", 6000);
+            return;
+        }
+        List<String[]> apps = cleanupTargets();
+        if (apps.isEmpty()) { showHint("Nothing to stop · " + memoryLabel(), 3000); return; }
+        boolean started = CleanerService.run(apps, n -> handler.postDelayed(() ->
+                showHint("Stopped " + n + " app" + (n == 1 ? "" : "s") + " · " + memoryLabel(), 4000), 900));
+        if (!started) showHint("Clean-up is starting up, try again in a moment", 3000);
+    }
+
+    private List<String[]> cleanupTargets() {
+        Set<String> keep = new HashSet<>();
+        keep.add(getPackageName());
+        keep.add(liveTvPkg);
+        keep.add(inputPickerPkg);
+        keep.add("com.android.tv.settings");
+        String ime = Settings.Secure.getString(getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
+        if (ime != null) keep.add(ime.split("/")[0]);
         PackageManager pm = getPackageManager();
-        Set<String> targets = new HashSet<>();
+        Map<String, String> launchable = new HashMap<>();
         for (ResolveInfo ri : pm.queryIntentActivities(
                 new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER), 0))
-            targets.add(ri.activityInfo.packageName);
-        for (android.content.pm.ApplicationInfo ai : pm.getInstalledApplications(0))
-            if ((ai.flags & android.content.pm.ApplicationInfo.FLAG_SYSTEM) == 0) targets.add(ai.packageName);
-        targets.remove(getPackageName());
-        targets.remove(liveTvPkg);
-        targets.remove(inputPickerPkg);
-        String ime = Settings.Secure.getString(getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
-        if (ime != null) targets.remove(ime.split("/")[0]);
-        new Thread(() -> {
-            android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo();
-            am.getMemoryInfo(mi);
-            long before = mi.availMem;
-            for (String p : targets) am.killBackgroundProcesses(p);
-            try { Thread.sleep(800); } catch (InterruptedException ignored) { }
-            am.getMemoryInfo(mi);
-            long freed = Math.max(0, (mi.availMem - before) >> 20);
-            if (done != null) runOnUiThread(() -> done.accept(freed));
-        }).start();
+            launchable.put(ri.activityInfo.packageName, String.valueOf(ri.activityInfo.applicationInfo.loadLabel(pm)));
+        List<String[]> out = new ArrayList<>();
+        if (!hasUsageAccess()) return out;
+        android.app.usage.UsageStatsManager usm = (android.app.usage.UsageStatsManager) getSystemService(USAGE_STATS_SERVICE);
+        long now = System.currentTimeMillis();
+        for (android.app.usage.UsageStats u : usm.queryAndAggregateUsageStats(now - 24L * 3600 * 1000, now).values()) {
+            String p = u.getPackageName();
+            if (u.getLastTimeUsed() > now - 24L * 3600 * 1000 && launchable.containsKey(p) && !keep.contains(p))
+                out.add(new String[]{p, launchable.get(p)});
+        }
+        return out;
+    }
+
+    private void showHint(String text, long ms) {
+        if (movingPkg != null) return;
+        hint.setText(text);
+        hint.setVisibility(View.VISIBLE);
+        hint.setAlpha(0f);
+        hint.animate().alpha(1f).setDuration(200).start();
+        handler.postDelayed(() -> {
+            if (movingPkg == null) hint.animate().alpha(0f).setDuration(300).withEndAction(() -> hint.setVisibility(View.GONE)).start();
+        }, ms);
     }
 
     // ---------------------------------------------------------------- start on input
@@ -1435,14 +1461,8 @@ public class MainActivity extends Activity {
             prefs.edit().putInt("shelf", (prefs.getInt("shelf", 1) + 1) % 3).apply();
             applyLook();
         }));
-        final TextView[] freeValue = new TextView[1];
-        View freeRow = settingRow("Free up memory", this::memoryLabel, () -> freeMemory(freed -> {
-            if (freeValue[0] != null) freeValue[0].setText(freed > 0 ? "Freed " + freed + " MB · " + memoryLabel() : memoryLabel());
-        }));
-        freeValue[0] = (TextView) freeRow.getTag();
-        rows.add(freeRow);
-        rows.add(settingRow("Close apps when I return Home", () -> pref("auto_clean", false) ? "On" : "Off", () ->
-                prefs.edit().putBoolean("auto_clean", !pref("auto_clean", false)).apply()));
+        rows.add(settingRow("Free up memory (force stop apps)",
+                () -> CleanerService.isEnabled(this) ? memoryLabel() : "Set up", this::startCleanup));
         rows.add(settingRow("Hidden apps", () -> String.valueOf(userHidden().size()), this::showHiddenApps));
         rows.add(settingRow("Reset app order", () -> "", () -> {
             prefs.edit().remove("dock").remove("grid").apply();

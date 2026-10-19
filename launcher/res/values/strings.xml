@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cleaner_label">Home: Free up memory</string>
+    <string name="cleaner_description">Lets Home Settings › Free up memory force-stop your apps by pressing Force stop in each app\'s App info page, like Greenify. It only works inside the TV\'s Settings app, only when you start a clean-up, and Home has no internet access.</string>
+</resources>

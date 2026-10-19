@@ -84,7 +84,11 @@ your apps follow in rows of wide icons over a frosted blur. Focus lifts an icon 
 - **Recently used** row (needs usage access, granted at install) and **Home Settings** at the bottom:
   clock on/off, recent row, auto-switch to an HDMI input when its device turns on, wallpaper interval
   and source (built-in and/or your photos in `Pictures/Wallpapers`, e.g. sent with LocalSend),
-  start the TV on an input, app-lock PIN, shelf darkness, hidden apps, reset order, free up memory.
+  start the TV on an input, app-lock PIN, shelf darkness, hidden apps, reset order.
+- **Free up memory**: force-stops the apps you used in the last day, Greenify-style, by pressing Force
+  stop on each app's App info page. Switch on *Home: Free up memory* once in Settings › Accessibility.
+  The service is limited to the Settings app (it never sees other apps' screens), only acts during a
+  clean-up you start, and the launcher has no internet permission.
 - **Aerial screensaver**: the photos drift slowly with a large clock; set as the TV's screensaver at install.
 - 12 nature photos (`launcher/assets/wallpapers/`, credits in `launcher/WALLPAPER-CREDITS.md`).
 
@@ -94,7 +98,7 @@ The default dock comes from `config.xml`; once you rearrange apps on the TV, tha
 ## Gotchas we hit
 
 - **Hisense-made sets (Vu, some Toshiba) ignore `killBackgroundProcesses`** for third-party callers
-  ("Invalid packageName"), so Home Settings › Free up memory frees little there.
+  ("Invalid packageName"), hence the accessibility-based Free up memory instead.
 - **The remote's Menu key opens the TV's own quick settings** on Vu/Hisense; use long-press OK for app options.
 
 - **macOS blocks the `adb` binary** on the local network ("No route to host"). `tools/tv.py` uses
