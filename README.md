@@ -51,7 +51,7 @@ are looked for in `%USERPROFILE%\tvhome-toolchain` (`jdk-17*` and `sdk\`), or se
 
 ```powershell
 python -m venv tools\venv; tools\venv\Scripts\pip install -r tools\requirements.txt
-"192.168.1.5" | Out-File -Encoding ascii -NoNewline tools\.tv_host   # your TV's IP
+"192.168.1.x" | Out-File -Encoding ascii -NoNewline tools\.tv_host   # your TV's IP
 tools\venv\Scripts\python -I tools\tv.py --probe
 launcher\build-and-install.ps1 -Overlay examples\vu-glo-google-tv\res   # -Overlay: your TV's config
 ```
