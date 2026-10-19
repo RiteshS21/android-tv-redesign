@@ -47,16 +47,16 @@ Undo everything with `tools/restore.sh <the same list>`.
 ## Do it by hand (Windows)
 
 Needs Python 3 and PowerShell 7 (`pwsh`). JDK 17 and the Android SDK (platform 34, build-tools 34.0.0)
-are looked for in `%USERPROFILE%	vhome-toolchain` (`jdk-17*` and `sdk\`), or set `JAVA_HOME` / `ANDROID_HOME`.
+are looked for in `%USERPROFILE%\tvhome-toolchain` (`jdk-17*` and `sdk\`), or set `JAVA_HOME` / `ANDROID_HOME`.
 
 ```powershell
-python -m venv toolsenv; toolsenv\Scripts\pip install -r toolsequirements.txt
+python -m venv tools\venv; tools\venv\Scripts\pip install -r tools\requirements.txt
 "192.168.1.5" | Out-File -Encoding ascii -NoNewline tools\.tv_host   # your TV's IP
-toolsenv\Scripts\python -I tools	v.py --probe
-launcheruild-and-install.ps1 -Overlay examplesu-glo-google-tves   # -Overlay: your TV's config
+tools\venv\Scripts\python -I tools\tv.py --probe
+launcher\build-and-install.ps1 -Overlay examples\vu-glo-google-tv\res   # -Overlay: your TV's config
 ```
 
-Undo everything with `toolsestore.ps1 <debloat list>` (add `-RemoveLauncher` to uninstall it too).
+Undo everything with `tools\restore.ps1 <debloat list>` (add `-RemoveLauncher` to uninstall it too).
 
 ## What's here
 
