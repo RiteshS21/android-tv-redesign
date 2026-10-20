@@ -45,9 +45,10 @@ def push_b64(dev, local, remote, chunk=48_000):
     tmp = remote + ".b64"
     dev.shell(f"rm -f {tmp} {remote}")
     for i in range(0, len(enc), chunk):
-        dev.shell(f"echo -n '{enc[i:i + chunk]}' >> {tmp}")
-    dev.shell(f"base64 -d {tmp} > {remote} && rm -f {tmp}")
-    remote_md5 = dev.shell(f"md5sum {remote}").split()[0]
+        dev.shell(f"echo -n '{enc[i:i + chunk]}' >> {tmp}", read_timeout_s=60)
+    # Decoding a large APK on a slow TV takes longer than adb-shell's default 10 s.
+    dev.shell(f"base64 -d {tmp} > {remote} && rm -f {tmp}", read_timeout_s=120)
+    remote_md5 = dev.shell(f"md5sum {remote}", read_timeout_s=60).split()[0]
     local_md5 = hashlib.md5(data).hexdigest()
     if remote_md5 != local_md5:
         sys.exit(f"md5 mismatch: {remote_md5} != {local_md5}")

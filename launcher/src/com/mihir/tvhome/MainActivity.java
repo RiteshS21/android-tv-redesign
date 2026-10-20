@@ -90,6 +90,12 @@ public class MainActivity extends Activity {
     private FrameLayout frost;
     private ImageView frostImg;
     private Drawable frostCurrent;
+    // Soft light behind the dock in the focused app's colour.
+    private View glow;
+    private GradientDrawable glowBg;
+    private int glowColor;
+    private android.animation.ValueAnimator glowAnim;
+    private final java.util.Map<String, Integer> glowCache = new HashMap<>();
     private List<String> wallpapers = new ArrayList<>();
     private int wallIndex = -1;
     private long wallChangedAt;
@@ -240,6 +246,17 @@ public class MainActivity extends Activity {
         shelfTint = new View(this);
         frost.addView(shelfTint, new FrameLayout.LayoutParams(-1, -1));
         root.addView(frost, new FrameLayout.LayoutParams(-1, -1));
+
+        // A flat ellipse of light behind the dock tray that takes the focused app's colour.
+        glow = new View(this);
+        glowBg = new GradientDrawable();
+        glowBg.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+        glowBg.setGradientRadius(dp(300));
+        glowBg.setColors(new int[]{0, 0});
+        glow.setBackground(glowBg);
+        glow.setScaleY(0.55f);
+        glow.setAlpha(0f);
+        root.addView(glow, new FrameLayout.LayoutParams(dp(600), dp(600)));
 
         scroll = new HomeScrollView(this);
         scroll.setVerticalScrollBarEnabled(false);
@@ -618,6 +635,8 @@ public class MainActivity extends Activity {
                     .setInterpolator(new DecelerateInterpolator(2.2f))
                     .setDuration(has ? 260 : 180).start();
             gloss.animate().alpha(has ? 1f : 0f).setDuration(200).start();
+            if (inDock && has) showGlow(v, app);
+            else if (inDock) handler.post(() -> { if (!dockCards.contains(getCurrentFocus())) hideGlow(); });
             if (!has) { sweep.animate().cancel(); sweep.setAlpha(0f); return; }
             sweep.setAlpha(1f);
             sweep.setTranslationX(-dp(80));
@@ -1399,6 +1418,73 @@ public class MainActivity extends Activity {
             if (n > 0) color = Color.rgb((int) (r / n), (int) (g / n), (int) (b / n));
         } catch (RuntimeException ignored) { }
         edgeCache.put(pkg, color);
+        return color;
+    }
+
+    /** Move the dock glow under {@code card} (where it sits once the page is scrolled to the top) and recolour it. */
+    private void showGlow(View card, App app) {
+        float cx = dockRow.getLeft() + ((View) card.getParent()).getLeft() + card.getLeft() + card.getWidth() / 2f;
+        float cy = dockRow.getTop() + dockRow.getHeight() * 0.3f;
+        float x = cx - glow.getWidth() / 2f, y = cy - glow.getHeight() / 2f;
+        boolean shown = glow.getAlpha() > 0.05f;
+        if (shown) glow.animate().translationX(x).translationY(y).alpha(1f).setDuration(320)
+                .setInterpolator(new DecelerateInterpolator(2f)).start();
+        else {
+            glow.setTranslationX(x);
+            glow.setTranslationY(y);
+            glow.animate().alpha(1f).setDuration(300).start();
+        }
+        int color = glowColor(app);
+        if (glowAnim != null) glowAnim.cancel();
+        int from = shown ? glowColor : color;
+        glowColor = color;
+        glowAnim = android.animation.ValueAnimator.ofArgb(from, color);
+        glowAnim.setDuration(shown ? 400 : 0);
+        glowAnim.addUpdateListener(va -> {
+            int rgb = (int) va.getAnimatedValue() & 0x00FFFFFF;
+            glowBg.setColors(new int[]{0xA6000000 | rgb, 0x40000000 | rgb, rgb});
+        });
+        glowAnim.start();
+    }
+
+    private void hideGlow() {
+        glow.animate().alpha(0f).setDuration(300).start();
+    }
+
+    /** The app's art averaged with weight on bright, saturated pixels, then made vivid; soft white for grey art. */
+    private int glowColor(App app) {
+        Integer cached = glowCache.get(app.pkg);
+        if (cached != null) return cached;
+        int color = 0xFFB8C4E0;
+        try {
+            // Draw a copy: the tile's ImageView is showing app.art, and changing its bounds would move it.
+            Drawable.ConstantState cs = app.art.getConstantState();
+            Drawable d = cs != null ? cs.newDrawable(getResources()) : app.art;
+            android.graphics.Rect old = d.copyBounds();
+            Bitmap bm = Bitmap.createBitmap(32, 18, Bitmap.Config.ARGB_8888);
+            d.setBounds(0, 0, 32, 18);
+            d.draw(new Canvas(bm));
+            d.setBounds(old);
+            float[] hsv = new float[3];
+            double r = 0, g = 0, b = 0, sum = 0;
+            for (int y = 0; y < 18; y++) for (int x = 0; x < 32; x++) {
+                int px = bm.getPixel(x, y);
+                if (Color.alpha(px) < 128) continue;
+                Color.colorToHSV(px, hsv);
+                double w = 0.02 + hsv[1] * hsv[1] * hsv[2];
+                r += Color.red(px) * w; g += Color.green(px) * w; b += Color.blue(px) * w; sum += w;
+            }
+            bm.recycle();
+            if (sum > 0) {
+                Color.colorToHSV(Color.rgb((int) (r / sum), (int) (g / sum), (int) (b / sum)), hsv);
+                if (hsv[1] >= 0.15f) {
+                    hsv[1] = Math.min(1f, hsv[1] * 1.15f);
+                    hsv[2] = Math.max(hsv[2], 0.9f);
+                    color = Color.HSVToColor(hsv);
+                }
+            }
+        } catch (RuntimeException ignored) { }
+        glowCache.put(app.pkg, color);
         return color;
     }
 
