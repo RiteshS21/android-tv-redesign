@@ -6,8 +6,8 @@ Claude Code with one prompt, or do it by hand with the scripts here.
 
 ![Before: Google TV home with a sponsored hero. After: clean dock over a Lake Louise wallpaper](before-after.png)
 
-On a 2 GB TCL Google TV this disabled 25 bloat apps and cut the home screen's memory use from
-192 MB to 83 MB. Everything is reversible: packages are disabled, never uninstalled.
+On a 2 GB TCL Google TV this disabled 25 bloat apps. Everything is reversible: packages are
+disabled, never uninstalled.
 
 ## Do it with Claude Code (easiest)
 
@@ -133,7 +133,6 @@ New **Light** theme, in each look:
 - **Hisense-made sets (Vu, some Toshiba) ignore `killBackgroundProcesses`** for third-party callers
   ("Invalid packageName"), hence the accessibility-based Free up memory instead.
 - **The remote's Menu key opens the TV's own quick settings** on Vu/Hisense; use long-press OK for app options.
-
 - **macOS blocks the `adb` binary** on the local network ("No route to host"). `tools/tv.py` uses
   the `adb-shell` Python package instead.
 - **Google TV hijacks the Home button.** With the stock launcher disabled, the setup app
