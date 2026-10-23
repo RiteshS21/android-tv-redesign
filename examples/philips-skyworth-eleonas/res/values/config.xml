@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Philips Smart 4K TV (Skyworth, eleonas) overrides for launcher/res/values/config.xml.
+     Build with: OVERLAY=examples/philips-skyworth-eleonas/res launcher/build-and-install.sh -->
+<resources>
+    <string-array name="dock_apps">
+        <item>com.netflix.ninja</item>
+        <item>com.google.android.youtube.tv</item>
+        <item>com.stremio.one</item>
+        <item>com.lagradost.cloudstream3</item>
+        <item>com.google.android.youtube.tvmusic</item>
+    </string-array>
+
+    <!-- com.cltv.hybrid is Live TV and the HDMI inputs, reached from the Inputs menu instead. -->
+    <string-array name="hidden_apps">
+        <item>com.cltv.hybrid</item>
+    </string-array>
+
+    <string name="live_tv_package" translatable="false">com.cltv.hybrid</string>
+
+    <string name="input_picker_package" translatable="false">com.cltv.hybrid</string>
+</resources>

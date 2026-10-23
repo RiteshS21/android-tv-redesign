@@ -71,6 +71,8 @@ public class MainActivity extends Activity {
         String pkg, label;
         ComponentName component;
         Drawable art;
+        Drawable mono; // logo for the Minimal look, or null (name only)
+        boolean monoGlyph; // mono is a one-colour glyph to tint; otherwise a greyscale copy of the icon
         boolean isBanner;
         int color;
     }
@@ -101,7 +103,8 @@ public class MainActivity extends Activity {
     private long wallChangedAt;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable rotateWallpaper = this::nextWallpaper;
-    private View clockBlock, shelfTint, inputsBtn;
+    private View clockBlock, shelfTint, themeDim, scrim, minimalScrim, inputsBtn;
+    private GradientDrawable capsuleBg;
     private final java.util.Map<String, Integer> edgeCache = new HashMap<>();
     private final BroadcastReceiver screenOn = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) { openStartTarget(); }
@@ -122,6 +125,15 @@ public class MainActivity extends Activity {
     private String movingPkg;
     private android.animation.ObjectAnimator wiggle;
     private TextView hint;
+    // Home Settings › Look: the tvOS icons, or CleanFrame-style quiet names and white logos.
+    private static final int LOOK_TV = 0, LOOK_DOCK = 1, LOOK_LIST = 2;
+    private GradientDrawable dockTray;
+    private View mediaCardView;
+    // Now-playing card under the clock (shown only while an app has a media session with a title).
+    private NowPlaying media;
+    private LinearLayout mediaCard;
+    private ImageView mediaArt, prevBtn, playBtn, nextBtn;
+    private TextView mediaTitle, mediaSub;
 
     private final BroadcastReceiver tick = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) { updateClock(); updateWifi(); }
@@ -143,6 +155,7 @@ public class MainActivity extends Activity {
         liveTvPkg = getString(R.string.live_tv_package);
         inputPickerPkg = getString(R.string.input_picker_package);
         cols = getResources().getInteger(R.integer.columns);
+        media = new NowPlaying(this, this::updateMedia);
         getWindow().getDecorView().setSystemUiVisibility(
                 View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                         | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
@@ -173,9 +186,10 @@ public class MainActivity extends Activity {
         resumed = true;
         updateClock();
         updateWifi();
+        media.start();
         View last = lastFocusedId == View.NO_ID ? null : findViewById(lastFocusedId);
         if (last == null && !dockCards.isEmpty()) last = dockCards.get(0);
-        if (last != null) last.requestFocus();
+        if (last != null) last.requestFocusFromTouch(); // FromTouch: still shows focus after a tap
         // Catch installs/removals that happened while another app was in front.
         if (getPackageManager().getChangedPackages(packageSeq) != null) buildApps();
         if (firstShow) { firstShow = false; playEntrance(); }
@@ -191,6 +205,7 @@ public class MainActivity extends Activity {
         super.onPause();
         handler.removeCallbacks(rotateWallpaper);
         unregisterReceiver(tick);
+        media.stop();
         resumed = false;
         if (menuPopup != null) menuPopup.dismiss();
         if (settingsPopup != null) settingsPopup.dismiss();
@@ -211,7 +226,7 @@ public class MainActivity extends Activity {
         super.onNewIntent(intent);
         // Home pressed while already home: jump back to the first dock app.
         if (menuPopup != null) menuPopup.dismiss();
-        if (!dockCards.isEmpty()) dockCards.get(0).requestFocus();
+        if (!dockCards.isEmpty()) dockCards.get(0).requestFocusFromTouch();
         scroll.smoothScrollTo(0, 0);
     }
 
@@ -233,9 +248,9 @@ public class MainActivity extends Activity {
         root.addView(wallBack, new FrameLayout.LayoutParams(-1, -1));
         root.addView(wallFront, new FrameLayout.LayoutParams(-1, -1));
         // Light scrim at the very top so the clock and buttons stay readable on bright photos.
-        View scrim = new View(this);
+        scrim = new View(this);
         scrim.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0x8C000000, 0x1A000000, 0x00000000, 0x00000000}));
+                new int[]{0xA6000000, 0x33000000, 0x00000000, 0x00000000}));
         root.addView(scrim, new FrameLayout.LayoutParams(-1, -1));
 
         // Frosted shelf behind the app rows. It is moved (not resized) as the rows scroll, and the
@@ -246,6 +261,12 @@ public class MainActivity extends Activity {
         shelfTint = new View(this);
         frost.addView(shelfTint, new FrameLayout.LayoutParams(-1, -1));
         root.addView(frost, new FrameLayout.LayoutParams(-1, -1));
+        // Theme: dims or hides the photo (and the frost) under everything else.
+        themeDim = new View(this);
+        root.addView(themeDim, new FrameLayout.LayoutParams(-1, -1));
+        // Minimal looks on a photo: shade behind the names so white text reads on bright skies.
+        minimalScrim = new View(this);
+        root.addView(minimalScrim, new FrameLayout.LayoutParams(-1, -1));
 
         // A flat ellipse of light behind the dock tray that takes the focused app's colour.
         glow = new View(this);
@@ -279,13 +300,14 @@ public class MainActivity extends Activity {
         hero.addView(buildHeader(), lp(-2, -2, Gravity.END | Gravity.TOP, 0, dp(24), dp(40), 0));
         clockBlock = buildClock();
         hero.addView(clockBlock, lp(dp(420), -2, Gravity.START | Gravity.TOP, dp(48), dp(36), 0, 0));
+        hero.addView(mediaCardView = buildMediaCard(), lp(-2, -2, Gravity.START | Gravity.TOP, dp(48), dp(150), 0, 0));
         hero.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> positionFrost());
 
         // The dock sits in a rounded glass tray over the photo, like tvOS's top row.
         dockRow = row();
         // Side padding fits an end icon's 16% focus growth inside the glass, with room to spare.
         dockRow.setPadding(dp(30), dp(18), dp(30), dp(18));
-        GradientDrawable tray = new GradientDrawable();
+        GradientDrawable tray = dockTray = new GradientDrawable();
         tray.setCornerRadius(dp(28));
         tray.setColor(0x38FFFFFF);
         tray.setStroke(Math.max(1, dp(0.5f)), 0x24FFFFFF);
@@ -327,7 +349,7 @@ public class MainActivity extends Activity {
         FrameLayout header = new FrameLayout(this);
         header.setClipChildren(false);
         View capsule = new View(this);
-        GradientDrawable cb = new GradientDrawable();
+        GradientDrawable cb = capsuleBg = new GradientDrawable();
         cb.setCornerRadius(dp(27));
         cb.setColor(0x47000000);
         cb.setStroke(Math.max(1, dp(0.5f)), 0x2EFFFFFF);
@@ -346,6 +368,8 @@ public class MainActivity extends Activity {
         View wifi = glassButton(R.drawable.ic_wifi, "Wi-Fi", right);
         wifiCaption = (TextView) wifi.getTag();
         wifi.setOnClickListener(v -> launch(new Intent(Settings.ACTION_WIFI_SETTINGS)));
+        View controls = glassButton(R.drawable.ic_control, "Controls", right);
+        controls.setOnClickListener(v -> showControlCenter());
         View settings = glassButton(R.drawable.ic_settings, "Settings", right);
         settings.setOnClickListener(v -> launch(new Intent(Settings.ACTION_SETTINGS)));
         header.addView(right, new FrameLayout.LayoutParams(-2, -2));
@@ -366,6 +390,7 @@ public class MainActivity extends Activity {
     private View buildClock() {
         LinearLayout left = new LinearLayout(this);
         left.setOrientation(LinearLayout.VERTICAL);
+        left.setClipChildren(false); // text shadows reach past the rows; clipped they show as dark boxes
         greeting = text(10, "sans-serif-medium", 0xB3FFFFFF);
         greeting.setLetterSpacing(0.25f);
         greeting.setSingleLine(true);
@@ -373,6 +398,7 @@ public class MainActivity extends Activity {
         left.addView(greeting);
 
         LinearLayout clockRow = new LinearLayout(this);
+        clockRow.setClipChildren(false);
         clockRow.setGravity(Gravity.BOTTOM);
         clock = text(54, "sans-serif-thin", Color.WHITE);
         clock.setIncludeFontPadding(false);
@@ -424,8 +450,8 @@ public class MainActivity extends Activity {
         b.setTag(label);
 
         b.setOnFocusChangeListener((v, has) -> {
-            bg.setColor(has ? 0xFFF5F5F7 : Color.TRANSPARENT);
-            b.setColorFilter(has ? 0xFF1C1C1E : Color.WHITE);
+            bg.setColor(!has ? Color.TRANSPARENT : light() ? 0xFF1C1C1E : 0xFFF5F5F7);
+            b.setColorFilter(has == light() ? Color.WHITE : 0xFF1C1C1E);
             v.animate().scaleX(has ? 1.15f : 1f).scaleY(has ? 1.15f : 1f).translationZ(has ? dp(8) : 0)
                     .setInterpolator(new DecelerateInterpolator(2f)).setDuration(200).start();
             label.animate().alpha(has ? 1f : 0f).setDuration(180).start();
@@ -465,6 +491,10 @@ public class MainActivity extends Activity {
             a.isBanner = banner != null;
             a.art = banner != null ? banner : ri.loadIcon(pm);
             a.color = sampleColor(a.pkg, a.art);
+            Drawable icon = ri.loadIcon(pm);
+            a.mono = monoIcon(a.pkg, icon);
+            a.monoGlyph = a.mono != null;
+            if (a.mono == null) a.mono = grey(icon);
             byPkg.put(a.pkg, a);
         }
 
@@ -482,6 +512,8 @@ public class MainActivity extends Activity {
         Collections.sort(others, (x, y) -> x.label.compareToIgnoreCase(y.label));
         rest.addAll(others);
 
+        int look = look();
+        layoutForLook(look);
         dockRow.removeAllViews();
         grid.removeAllViews();
         dockCards.clear();
@@ -492,9 +524,19 @@ public class MainActivity extends Activity {
         for (App a : rest) order.add(a.pkg);
         dockSize = dock.size();
 
-        for (int i = 0; i < dock.size(); i++) dockRow.addView(tile(dock.get(i), true, dockCards), cell(i));
-        padRow(dockRow, dock.size());
-        if (!dockCards.isEmpty()) cardRows.add(dockCards);
+        if (look == LOOK_LIST) {
+            // One app per row, so Up/Down walks the list.
+            for (App a : dock) {
+                List<View> one = new ArrayList<>();
+                dockRow.addView(minimalTile(a, true, one), new LinearLayout.LayoutParams(-2, -2));
+                dockCards.addAll(one);
+                cardRows.add(one);
+            }
+        } else {
+            for (int i = 0; i < dock.size(); i++) dockRow.addView(card(dock.get(i), true, dockCards), cell(i));
+            padRow(dockRow, dock.size());
+            if (!dockCards.isEmpty()) cardRows.add(dockCards);
+        }
 
         // Recently used apps (not already in the dock), newest first.
         List<App> recent = new ArrayList<>();
@@ -503,33 +545,41 @@ public class MainActivity extends Activity {
             if (a != null && order.indexOf(p) >= dockSize && recent.size() < cols) recent.add(a);
         }
         if (recent.size() >= 2) {
-            grid.addView(sectionLabel("RECENTLY USED"), llp(-2, -2, dp(4), 0, 0, dp(14)));
-            LinearLayout r = row();
-            List<View> cards = new ArrayList<>();
-            for (int i = 0; i < recent.size(); i++) r.addView(tile(recent.get(i), false, cards), cell(i));
-            padRow(r, recent.size());
-            grid.addView(r, llp(-1, -2, 0, 0, 0, dp(26)));
-            cardRows.add(cards);
-            grid.addView(sectionLabel("ALL APPS"), llp(-2, -2, dp(4), 0, 0, dp(14)));
+            grid.addView(sectionLabel("RECENTLY USED"), llp(-2, -2, dp(look == LOOK_LIST ? 14 : 4), 0, 0, dp(14)));
+            if (look == LOOK_LIST) addListRows(recent);
+            else {
+                LinearLayout r = row();
+                List<View> cards = new ArrayList<>();
+                for (int i = 0; i < recent.size(); i++) r.addView(card(recent.get(i), false, cards), cell(i));
+                padRow(r, recent.size());
+                grid.addView(r, llp(-1, -2, 0, 0, 0, dp(26)));
+                cardRows.add(cards);
+            }
+            grid.addView(sectionLabel("ALL APPS"), llp(-2, -2, dp(look == LOOK_LIST ? 14 : 4), 0, 0, dp(14)));
         }
 
+        if (recent.size() < 2 && look != LOOK_TV && !rest.isEmpty())
+            grid.addView(sectionLabel("ALL APPS"), llp(-2, -2, dp(look == LOOK_LIST ? 14 : 4), dp(look == LOOK_LIST ? 18 : 0), 0, dp(14)));
+        if (look == LOOK_LIST) addListRows(rest);
         LinearLayout row = null;
         List<View> cards = null;
-        for (int i = 0; i < rest.size(); i++) {
+        for (int i = 0; look != LOOK_LIST && i < rest.size(); i++) {
             if (i % cols == 0) {
                 row = row();
                 grid.addView(row, llp(-1, -2, 0, 0, 0, dp(26)));
                 cards = new ArrayList<>();
                 cardRows.add(cards);
             }
-            row.addView(tile(rest.get(i), false, cards), cell(i % cols));
+            row.addView(card(rest.get(i), false, cards), cell(i % cols));
         }
         if (row != null) padRow(row, rest.size() % cols);
 
         // Home Settings, at the very bottom like tvOS's Settings app is never far away.
         LinearLayout settingsRow = row();
-        settingsRow.setGravity(Gravity.CENTER_HORIZONTAL);
-        TextView settingsBtn = text(12, "sans-serif-medium", 0xE6FFFFFF);
+        // List: left-aligned with the names; otherwise centred under the grid.
+        settingsRow.setGravity(look == LOOK_LIST ? Gravity.START : Gravity.CENTER_HORIZONTAL);
+        settingsRow.setPadding(look == LOOK_LIST ? dp(4) : 0, 0, 0, 0);
+        TextView settingsBtn = text(12, "sans-serif-medium", ink(0xE6));
         settingsBtn.setText("⚙   Home Settings");
         settingsBtn.setGravity(Gravity.CENTER);
         settingsBtn.setPadding(dp(20), 0, dp(20), 0);
@@ -538,12 +588,13 @@ public class MainActivity extends Activity {
         settingsBtn.setId(View.generateViewId());
         GradientDrawable sb = new GradientDrawable();
         sb.setCornerRadius(dp(18));
-        sb.setColor(0x26FFFFFF);
-        sb.setStroke(Math.max(1, dp(0.5f)), 0x33FFFFFF);
+        int idle = light() ? 0x14000000 : 0x26FFFFFF;
+        sb.setColor(idle);
+        sb.setStroke(Math.max(1, dp(0.5f)), light() ? 0x1F000000 : 0x33FFFFFF);
         settingsBtn.setBackground(sb);
         settingsBtn.setOnFocusChangeListener((v, has) -> {
-            sb.setColor(has ? 0xFFF5F5F7 : 0x26FFFFFF);
-            settingsBtn.setTextColor(has ? 0xFF1C1C1E : 0xE6FFFFFF);
+            sb.setColor(!has ? idle : light() ? 0xFF1C1C1E : 0xFFF5F5F7);
+            settingsBtn.setTextColor(!has ? ink(0xE6) : light() ? Color.WHITE : 0xFF1C1C1E);
             v.animate().scaleX(has ? 1.08f : 1f).scaleY(has ? 1.08f : 1f).setDuration(180).start();
             if (has) { lastFocusedId = v.getId(); scrollToRow(v); }
         });
@@ -560,6 +611,17 @@ public class MainActivity extends Activity {
         else if (!dockCards.isEmpty()) dockCards.get(0).requestFocus();
     }
 
+    /** List look: each app on its own row, so Up/Down walks every app and the row scrolls into view. */
+    private void addListRows(List<App> apps) {
+        for (int i = 0; i < apps.size(); i++) {
+            LinearLayout r = row();
+            List<View> one = new ArrayList<>();
+            r.addView(minimalTile(apps.get(i), false, one), new LinearLayout.LayoutParams(-2, -2));
+            grid.addView(r, llp(-1, -2, 0, 0, 0, i == apps.size() - 1 ? dp(26) : 0));
+            cardRows.add(one);
+        }
+    }
+
     private LinearLayout.LayoutParams cell(int col) {
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, -2, 1f);
         p.setMargins(col == 0 ? 0 : dp(11), 0, col == cols - 1 ? 0 : dp(11), 0);
@@ -573,6 +635,158 @@ public class MainActivity extends Activity {
             p.height = 1;
             row.addView(new View(this), p);
         }
+    }
+
+    private int look() {
+        return getPreferences(MODE_PRIVATE).getInt("look", LOOK_TV);
+    }
+
+    private View card(App app, boolean inDock, List<View> sink) {
+        return look() == LOOK_TV ? tile(app, inDock, sink) : minimalTile(app, inDock, sink);
+    }
+
+    /** Where the dock sits and how the clock reads, per look. */
+    private void layoutForLook(int look) {
+        int screenH = getResources().getDisplayMetrics().heightPixels;
+        // TV: photo fills the top half. Dock: the bar sits at the bottom. List: names start under the clock.
+        // Dark/Light have no photo to show, so the apps move up.
+        boolean photo = photoTheme();
+        hero.getLayoutParams().height = Math.round(screenH * (look == LOOK_TV ? (photo ? 0.52f : 0.30f)
+                : look == LOOK_DOCK ? (photo ? 0.68f : 0.42f) : 0.30f)); // dock: leaves room for the "ALL APPS" cue below
+        hero.requestLayout();
+        LinearLayout.LayoutParams d = (LinearLayout.LayoutParams) dockRow.getLayoutParams();
+        boolean list = look == LOOK_LIST;
+        dockRow.setOrientation(list ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
+        dockRow.setBackground(list ? null : dockTray);
+        dockRow.setPadding(list ? 0 : dp(30), list ? 0 : look == LOOK_DOCK ? dp(10) : dp(18), list ? 0 : dp(30), list ? 0 : look == LOOK_DOCK ? dp(10) : dp(18));
+        d.setMargins(list ? dp(34) : dp(74), dp(10), list ? 0 : dp(74), list ? 0 : dp(34));
+        ((LinearLayout.LayoutParams) grid.getLayoutParams()).setMargins(list ? dp(34) : dp(104), 0, list ? 0 : dp(104), dp(60));
+        boolean quiet = look != LOOK_TV;
+        clock.setTextSize(TypedValue.COMPLEX_UNIT_SP, quiet ? 26 : 54);
+        clock.setTypeface(Typeface.create(quiet ? "sans-serif-light" : "sans-serif-thin", Typeface.NORMAL));
+        for (View v : new View[]{greeting, ampm, date}) v.setVisibility(quiet ? View.GONE : View.VISIBLE);
+        ((FrameLayout.LayoutParams) mediaCardView.getLayoutParams()).topMargin = quiet ? dp(84) : dp(150);
+        // The frosted shelf's top edge cuts across the photo behind quiet text; the minimal scrim reads better.
+        frost.setVisibility(quiet ? View.GONE : View.VISIBLE);
+        hideGlow();
+        applyLook();
+    }
+
+    // CC0 Simple Icons marks for the default dock; other apps use their own monochrome layer if they ship one.
+    private static final Map<String, Integer> MONO = Map.of(
+            "com.netflix.ninja", R.drawable.mono_netflix,
+            "com.google.android.youtube.tv", R.drawable.mono_youtube,
+            "com.stremio.one", R.drawable.mono_stremio,
+            "com.google.android.youtube.tvmusic", R.drawable.mono_youtubemusic);
+
+    /** A one-colour logo to tint, or null (then {@link #grey} gives a greyscale copy of the icon). */
+    private Drawable monoIcon(String pkg, Drawable icon) {
+        Integer res = MONO.get(pkg);
+        if (res != null) return getDrawable(res);
+        if (icon instanceof android.graphics.drawable.AdaptiveIconDrawable) {
+            Drawable m = ((android.graphics.drawable.AdaptiveIconDrawable) icon).getMonochrome();
+            Drawable g = m == null ? null : trimmed(m);
+            if (g != null) return g;
+        }
+        return null;
+    }
+
+    /** No monochrome layer: the real icon in greyscale, so every app still has a mark. */
+    private static Drawable grey(Drawable icon) {
+        if (icon == null) return null;
+        android.graphics.ColorMatrix cm = new android.graphics.ColorMatrix();
+        cm.setSaturation(0);
+        Drawable g = icon.mutate();
+        g.setColorFilter(new android.graphics.ColorMatrixColorFilter(cm));
+        return g;
+    }
+
+    /** Crop a monochrome layer to its glyph, centred in a square, so thin marks (CloudStream) fill the icon box. */
+    private Drawable trimmed(Drawable d) {
+        int n = 192;
+        Bitmap bm = Bitmap.createBitmap(n, n, Bitmap.Config.ARGB_8888);
+        d.setBounds(0, 0, n, n);
+        d.draw(new Canvas(bm));
+        int[] px = new int[n * n];
+        bm.getPixels(px, 0, n, 0, 0, n, n);
+        int l = n, t = n, r = -1, b = -1, solid = 0;
+        for (int y = 0; y < n; y++) for (int x = 0; x < n; x++) {
+            int al = Color.alpha(px[y * n + x]);
+            if (al < 24) continue;
+            if (al > 200) solid++;
+            l = Math.min(l, x); r = Math.max(r, x); t = Math.min(t, y); b = Math.max(b, y);
+        }
+        int w = r - l + 1, h = b - t + 1, side = Math.max(w, h);
+        // Empty, or a filled block rather than a glyph (some apps ship one): tinted it is just a white square.
+        if (r < 0 || solid > 0.8f * w * h) { bm.recycle(); return null; }
+        Bitmap out = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888);
+        new Canvas(out).drawBitmap(bm, (side - w) / 2f - l, (side - h) / 2f - t, null);
+        bm.recycle();
+        return new android.graphics.drawable.BitmapDrawable(getResources(), out);
+    }
+
+    /**
+     * CleanFrame-style tile: a white logo over the name (Dock), or a large name beside it (List).
+     * No colour, no lift; focus is a soft glass highlight.
+     */
+    private View minimalTile(App app, boolean inDock, List<View> sink) {
+        boolean list = look() == LOOK_LIST;
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(list ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
+        card.setGravity(list ? Gravity.CENTER_VERTICAL : Gravity.CENTER);
+        card.setPadding(dp(list ? 14 : 8), dp(list ? 6 : 12), dp(list ? 20 : 8), dp(list ? 6 : 12));
+        card.setId(View.generateViewId());
+        card.setFocusable(true);
+        card.setClickable(true);
+        card.setTag(app);
+        card.setContentDescription(app.label);
+        card.setClipChildren(false); // the name's shadow is wider than the padding
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(dp(14));
+        bg.setColor(Color.TRANSPARENT);
+        card.setBackground(bg);
+
+        if (app.mono != null) {
+            ImageView ic = new ImageView(this);
+            ic.setImageDrawable(app.mono);
+            if (app.monoGlyph) ic.setColorFilter(ink(0xFF));
+            else {
+                // A greyscale copy of a full icon: one rounded-square shape for all, a little quieter than glyphs.
+                ic.setOutlineProvider(new ViewOutlineProvider() {
+                    @Override public void getOutline(View v, Outline o) {
+                        o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), dp(6));
+                    }
+                });
+                ic.setClipToOutline(true);
+                ic.setAlpha(0.85f);
+            }
+            int size = dp(list ? 22 : 28);
+            card.addView(ic, list ? llp(size, size, 0, 0, dp(12), 0) : llp(size, size, 0, 0, 0, dp(8)));
+        } else if (list) {
+            card.addView(new View(this), llp(dp(22), dp(22), 0, 0, dp(12), 0)); // keep names in one column
+        }
+        TextView name = text(list ? 26 : 13, "sans-serif-medium", ink(0xE6));
+        name.setText(app.label);
+        name.setSingleLine(true);
+        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        name.setShadowLayer(dp(8), 0, dp(1), light() ? 0 : 0x80000000);
+        card.addView(name, new LinearLayout.LayoutParams(-2, -2)); // wrap, so the card's gravity centres it
+
+        card.setOnClickListener(v -> openApp(app));
+        card.setOnLongClickListener(v -> { showAppMenu(card, app); return true; });
+        card.setOnFocusChangeListener((v, has) -> {
+            bg.setColor(!has ? Color.TRANSPARENT : light() ? 0x1A000000 : 0x40FFFFFF);
+            name.setTextColor(ink(has ? 0xFF : 0xE6));
+            v.animate().scaleX(has ? 1.05f : 1f).scaleY(has ? 1.05f : 1f)
+                    .setInterpolator(new DecelerateInterpolator(2f)).setDuration(180).start();
+            if (!has) return;
+            lastFocusedId = v.getId();
+            if (inDock) scroll.smoothScrollTo(0, 0);
+            else scrollToRow(v);
+        });
+        cardByPkg.put(app.pkg, card);
+        sink.add(card);
+        return card;
     }
 
     /** A wide rounded icon (tvOS proportions). Focus lifts it and sweeps a highlight across. */
@@ -599,6 +813,12 @@ public class MainActivity extends Activity {
                 app.isBanner ? new int[]{edge, edge}
                         : new int[]{darken(app.color, 0.55f), darken(app.color, 0.35f)});
         card.setBackground(bg);
+        if (!photoTheme()) {
+            GradientDrawable ring = new GradientDrawable();
+            ring.setCornerRadius(dp(12));
+            ring.setStroke(Math.max(1, dp(1)), light() ? 0x26000000 : 0x33FFFFFF);
+            card.setForeground(ring);
+        }
 
         ImageView img = new ImageView(this);
         img.setImageDrawable(app.art);
@@ -675,6 +895,18 @@ public class MainActivity extends Activity {
                 v.setNextFocusDownId(r == cardRows.size() - 1 ? v.getId() : nearest(cardRows.get(r + 1), c, row.size()).getId());
             }
         }
+        // Now-playing card: Up from the left half of the dock reaches it; Right from it goes to the top bar.
+        boolean card = mediaCard != null && mediaCard.getVisibility() == View.VISIBLE;
+        pills.get(0).setNextFocusLeftId(card ? nextBtn.getId() : pills.get(0).getId());
+        if (!card) return;
+        View[] mb = {prevBtn, playBtn, nextBtn};
+        for (int i = 0; i < mb.length; i++) {
+            mb[i].setNextFocusLeftId(mb[i == 0 ? 0 : i - 1].getId());
+            mb[i].setNextFocusRightId(i == mb.length - 1 ? topId : mb[i + 1].getId());
+            mb[i].setNextFocusUpId(mb[i].getId());
+            mb[i].setNextFocusDownId(first != null ? first.get(0).getId() : mb[i].getId());
+        }
+        if (first != null) for (int c = 0; c < (first.size() + 1) / 2; c++) first.get(c).setNextFocusUpId(playBtn.getId());
     }
 
     /** The view in {@code to} under column {@code c} of a row with {@code width} items (centred for short rows). */
@@ -1131,7 +1363,7 @@ public class MainActivity extends Activity {
     }
 
     private TextView sectionLabel(String t) {
-        TextView l = text(10, "sans-serif-medium", 0x99FFFFFF);
+        TextView l = text(10, "sans-serif-medium", ink(0x99));
         l.setText(t);
         l.setLetterSpacing(0.22f);
         return l;
@@ -1150,6 +1382,58 @@ public class MainActivity extends Activity {
                 {0xBF0C0C10, 0xD90A0A0C, 0xF2050506}};  // dark
         int shelf = Math.max(0, Math.min(2, getPreferences(MODE_PRIVATE).getInt("shelf", 1)));
         shelfTint.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, shelves[shelf]));
+        int t = theme();
+        themeDim.setBackgroundColor(new int[]{Color.TRANSPARENT, 0x99000000, 0xFF0E0E10, 0xFFF2F2F5}[t]); // Photo, Dim, Dark, Light
+        // The glass tray dims with the photo, and is a faint panel on plain backgrounds.
+        dockTray.setColor(new int[]{0x38FFFFFF, 0x1AFFFFFF, 0x17FFFFFF, 0x0F000000}[t]);
+        dockTray.setStroke(Math.max(1, dp(0.5f)), new int[]{0x24FFFFFF, 0x1AFFFFFF, 0x14FFFFFF, 0x14000000}[t]);
+        scrim.setAlpha(photoTheme() ? 1f : 0f);
+        int look = look();
+        minimalScrim.setBackground(t != 0 || look == LOOK_TV ? null : look == LOOK_LIST
+                ? new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{0x8C000000, 0x4D000000, 0x00000000})
+                : new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, new int[]{0x99000000, 0x33000000, 0x00000000, 0x00000000}));
+        int[] alphas = {0xB3, 0xFF, 0xCC, 0x99};
+        TextView[] texts = {greeting, clock, ampm, date};
+        for (int i = 0; i < texts.length; i++) {
+            texts[i].setTextColor(ink(alphas[i]));
+            texts[i].setShadowLayer(dp(10), 0, dp(1), light() ? 0 : 0xB3000000);
+        }
+        capsuleBg.setColor(light() ? 0x14000000 : 0x47000000);
+        capsuleBg.setStroke(Math.max(1, dp(0.5f)), light() ? 0x1F000000 : 0x2EFFFFFF);
+        for (View p : pills) {
+            if (!p.hasFocus()) ((ImageView) p).setColorFilter(ink(0xFF));
+            if (p.getTag() instanceof TextView) {
+                ((TextView) p.getTag()).setTextColor(ink(0xFF));
+                ((TextView) p.getTag()).setShadowLayer(dp(6), 0, dp(1), light() ? 0 : 0xB3000000);
+            }
+        }
+    }
+
+    private int theme() {
+        return Math.max(0, Math.min(3, getPreferences(MODE_PRIVATE).getInt("theme", 0)));
+    }
+
+    private String themeName() {
+        return new String[]{"Photo", "Dim", "Dark", "Light"}[theme()];
+    }
+
+    private void cycleTheme() {
+        getPreferences(MODE_PRIVATE).edit().putInt("theme", (theme() + 1) % 4).apply();
+        buildApps(); // tiles, names and the photo area all depend on it
+    }
+
+    /** Photo or Dim: the wallpaper is showing. */
+    private boolean photoTheme() {
+        return theme() < 2;
+    }
+
+    private boolean light() {
+        return theme() == 3;
+    }
+
+    /** Text and icon colour for the theme (white, or near-black on Light) at the given alpha. */
+    private int ink(int alpha) {
+        return (alpha << 24) | (light() ? 0x1C1C1E : 0xFFFFFF);
     }
 
     // ---------------------------------------------------------------- memory
@@ -1167,11 +1451,7 @@ public class MainActivity extends Activity {
      */
     private void startCleanup() {
         if (settingsPopup != null) settingsPopup.dismiss();
-        if (!CleanerService.isEnabled(this)) {
-            launch(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
-            showHint("Turn on “Home: Free up memory”, then press Free up memory again", 6000);
-            return;
-        }
+        if (!CleanerService.isEnabled(this)) { needAccessibility("Free up memory"); return; }
         List<String[]> apps = cleanupTargets();
         if (apps.isEmpty()) { showHint("Nothing to stop · " + memoryLabel(), 3000); return; }
         boolean started = CleanerService.run(apps, n -> handler.postDelayed(() ->
@@ -1427,12 +1707,13 @@ public class MainActivity extends Activity {
         float cy = dockRow.getTop() + dockRow.getHeight() * 0.3f;
         float x = cx - glow.getWidth() / 2f, y = cy - glow.getHeight() / 2f;
         boolean shown = glow.getAlpha() > 0.05f;
-        if (shown) glow.animate().translationX(x).translationY(y).alpha(1f).setDuration(320)
+        float full = light() ? 0.4f : 1f; // on a light background the full glow reads as a coloured haze
+        if (shown) glow.animate().translationX(x).translationY(y).alpha(full).setDuration(320)
                 .setInterpolator(new DecelerateInterpolator(2f)).start();
         else {
             glow.setTranslationX(x);
             glow.setTranslationY(y);
-            glow.animate().alpha(1f).setDuration(300).start();
+            glow.animate().alpha(full).setDuration(300).start();
         }
         int color = glowColor(app);
         if (glowAnim != null) glowAnim.cancel();
@@ -1488,6 +1769,227 @@ public class MainActivity extends Activity {
         return color;
     }
 
+    // ---------------------------------------------------------------- Now playing
+
+    /** Artwork, title and artist with previous / play-pause / next, in a frosted pill like the top bar. */
+    private View buildMediaCard() {
+        mediaCard = row();
+        mediaCard.setGravity(Gravity.CENTER_VERTICAL);
+        mediaCard.setPadding(dp(8), dp(8), dp(10), dp(8));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(dp(22));
+        bg.setColor(0x47000000);
+        bg.setStroke(Math.max(1, dp(0.5f)), 0x2EFFFFFF);
+        mediaCard.setBackground(bg);
+
+        mediaArt = new ImageView(this);
+        mediaArt.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        GradientDrawable artBg = new GradientDrawable();
+        artBg.setCornerRadius(dp(10));
+        artBg.setColor(0x33FFFFFF);
+        mediaArt.setBackground(artBg);
+        mediaArt.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
+        mediaArt.setClipToOutline(true);
+        mediaCard.addView(mediaArt, new LinearLayout.LayoutParams(dp(48), dp(48)));
+
+        LinearLayout texts = new LinearLayout(this);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        mediaTitle = text(13, "sans-serif-medium", Color.WHITE);
+        mediaSub = text(11, "sans-serif", 0xB3FFFFFF);
+        for (TextView t : new TextView[]{mediaTitle, mediaSub}) {
+            t.setSingleLine(true);
+            t.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            t.setMaxWidth(dp(220));
+            texts.addView(t);
+        }
+        mediaCard.addView(texts, llp(-2, -2, dp(12), 0, dp(8), 0));
+
+        prevBtn = mediaButton(R.drawable.ic_prev, "Previous", c -> c.getTransportControls().skipToPrevious());
+        playBtn = mediaButton(R.drawable.ic_pause, "Play or pause", NowPlaying::playPause);
+        nextBtn = mediaButton(R.drawable.ic_next, "Next", c -> c.getTransportControls().skipToNext());
+        mediaCard.setVisibility(View.GONE);
+        return mediaCard;
+    }
+
+    private ImageView mediaButton(int icon, String caption, java.util.function.Consumer<android.media.session.MediaController> action) {
+        ImageView b = new ImageView(this);
+        b.setImageResource(icon);
+        b.setPadding(dp(8), dp(8), dp(8), dp(8));
+        b.setColorFilter(Color.WHITE);
+        b.setFocusable(true);
+        b.setClickable(true);
+        b.setId(View.generateViewId());
+        b.setContentDescription(caption);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.OVAL);
+        bg.setColor(Color.TRANSPARENT);
+        b.setBackground(bg);
+        b.setOnFocusChangeListener((v, has) -> {
+            bg.setColor(has ? 0xFFF5F5F7 : Color.TRANSPARENT);
+            b.setColorFilter(has ? 0xFF1C1C1E : Color.WHITE);
+            v.animate().scaleX(has ? 1.12f : 1f).scaleY(has ? 1.12f : 1f).setDuration(180).start();
+            if (has) { lastFocusedId = v.getId(); scroll.smoothScrollTo(0, 0); }
+        });
+        b.setOnClickListener(v -> {
+            android.media.session.MediaController c = media.current();
+            if (c != null) action.accept(c);
+        });
+        mediaCard.addView(b, llp(dp(36), dp(36), dp(2), 0, 0, 0));
+        return b;
+    }
+
+    private void updateMedia() {
+        if (mediaCard == null) return;
+        android.media.session.MediaController c = media.current();
+        boolean show = c != null;
+        if (show) {
+            mediaTitle.setText(NowPlaying.title(c));
+            mediaSub.setText(NowPlaying.subtitle(this, c));
+            Bitmap art = NowPlaying.art(c);
+            mediaArt.setImageBitmap(art);
+            mediaArt.setVisibility(art != null ? View.VISIBLE : View.GONE);
+            playBtn.setImageResource(NowPlaying.isPlaying(c) ? R.drawable.ic_pause : R.drawable.ic_play);
+        }
+        if ((mediaCard.getVisibility() == View.VISIBLE) == show) return;
+        if (!show && mediaCard.hasFocus() && !dockCards.isEmpty()) dockCards.get(0).requestFocus();
+        mediaCard.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (!pills.isEmpty()) wireFocus();
+    }
+
+    // ---------------------------------------------------------------- Control Center
+
+    private static final String VPN_APP = "ch.protonvpn.android";
+
+    /** tvOS-style Control Center: quick actions in the same side panel as Home Settings. */
+    private void showControlCenter() {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(24), dp(28), dp(24), dp(24));
+        panel.setBackgroundColor(0xFF1C1C1E);
+        TextView title = text(22, "sans-serif-medium", Color.WHITE);
+        title.setText("Control Center");
+        panel.addView(title, llp(-2, -2, dp(8), 0, 0, dp(18)));
+
+        List<View> rows = new ArrayList<>();
+        android.media.session.MediaController playing = media.current();
+        if (playing != null) {
+            View[] np = new View[1];
+            np[0] = settingRow(NowPlaying.title(playing), this::mediaActionLabel, () -> {
+                android.media.session.MediaController c = media.current();
+                if (c != null) NowPlaying.playPause(c);
+                // The app updates its state a moment later.
+                handler.postDelayed(() -> ((TextView) np[0].getTag()).setText(mediaActionLabel()), 700);
+            });
+            rows.add(np[0]);
+        }
+        rows.add(settingRow("Sleep", () -> CleanerService.isEnabled(this) ? "" : "Set up", () -> {
+            if (!CleanerService.isEnabled(this)) needAccessibility("Sleep");
+            else if (!CleanerService.sleep()) showHint("Sleep is starting up, try again in a moment", 3000);
+        }));
+        rows.add(settingRow("Sleep timer", this::sleepTimerLabel, this::cycleSleepTimer));
+        rows.add(settingRow("Sound", this::soundOutput, () -> {
+            if (!launch(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS))) launch(new Intent(Settings.ACTION_SETTINGS));
+        }));
+        rows.add(settingRow("VPN", () -> vpnOn() ? "Connected" : "Off", () -> {
+            if (isInstalled(VPN_APP)) openPackage(VPN_APP);
+            else launch(new Intent(Settings.ACTION_VPN_SETTINGS));
+        }));
+        rows.add(settingRow("Block ads", this::adBlockLabel, this::toggleAdBlock));
+        rows.add(settingRow("Inputs", () -> "", () -> {
+            if (settingsPopup != null) settingsPopup.dismiss();
+            showInputs(inputsBtn);
+        }));
+        rows.add(settingRow("Screensaver", () -> "", this::startScreensaver));
+        rows.add(settingRow("Free up memory",
+                () -> CleanerService.isEnabled(this) ? memoryLabel() : "Set up", this::startCleanup));
+        rows.add(settingRow("Theme", this::themeName, this::cycleTheme));
+        rows.add(settingRow("Home Settings", () -> "", this::showSettings));
+        for (View r : rows) panel.addView(r, llp(-1, dp(40), 0, 0, 0, dp(2)));
+        showPanel(panel, rows.get(0));
+    }
+
+    private String mediaActionLabel() {
+        android.media.session.MediaController c = media.current();
+        return c == null ? "" : NowPlaying.isPlaying(c) ? "Pause" : "Play";
+    }
+
+    private String sleepTimerLabel() {
+        if (!CleanerService.isEnabled(this)) return "Set up";
+        long at = CleanerService.sleepAt();
+        return at == 0 ? "Off" : "In " + ((at - System.currentTimeMillis()) / 60_000 + 1) + " min";
+    }
+
+    /** Off → 30 → 60 → 90 min → Off, going up from whatever is left. */
+    private void cycleSleepTimer() {
+        if (!CleanerService.isEnabled(this)) { needAccessibility("Sleep timer"); return; }
+        long at = CleanerService.sleepAt();
+        long left = at == 0 ? 0 : (at - System.currentTimeMillis()) / 60_000 + 1;
+        int next = at == 0 ? 30 : left <= 30 ? 60 : left <= 60 ? 90 : 0;
+        if (!CleanerService.sleepIn(next * 60_000L)) showHint("Sleep is starting up, try again in a moment", 3000);
+    }
+
+    /** The connected Bluetooth speaker or headphones, else the TV itself. */
+    private String soundOutput() {
+        android.media.AudioManager am = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+        if (am != null) for (android.media.AudioDeviceInfo d : am.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS)) {
+            int t = d.getType();
+            if (t == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP || t == android.media.AudioDeviceInfo.TYPE_BLE_HEADSET
+                    || t == android.media.AudioDeviceInfo.TYPE_BLE_SPEAKER) return String.valueOf(d.getProductName());
+        }
+        return "TV speakers";
+    }
+
+    private boolean vpnOn() {
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        NetworkCapabilities nc = cm == null ? null : cm.getNetworkCapabilities(cm.getActiveNetwork());
+        return nc != null && nc.hasTransport(NetworkCapabilities.TRANSPORT_VPN);
+    }
+
+    private void startScreensaver() {
+        if (settingsPopup != null) settingsPopup.dismiss();
+        Intent dream = new Intent().setClassName("com.android.systemui", "com.android.systemui.Somnambulator");
+        // Android TV Settings' "go to sleep" voice action starts the screensaver where SystemUI has no Somnambulator.
+        if (!launch(dream) && !launch(new Intent("com.google.android.pano.action.SLEEP")))
+            launch(new Intent(Settings.ACTION_DREAM_SETTINGS));
+    }
+
+    /** Sleep and Free up memory both use the accessibility service, which only the user can switch on. */
+    private void needAccessibility(String then) {
+        if (settingsPopup != null) settingsPopup.dismiss();
+        launch(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+        showHint("Turn on “Home: Free up memory”, then press " + then + " again", 6000);
+    }
+
+    // ---------------------------------------------------------------- Ad blocking (system Private DNS)
+
+    // System-wide DNS-over-TLS to AdGuard's blocking resolver: no VPN slot, no internet permission for us.
+    private static final String AD_DNS = "dns.adguard-dns.com";
+
+    private boolean adBlockOn() {
+        android.content.ContentResolver cr = getContentResolver();
+        return "hostname".equals(Settings.Global.getString(cr, "private_dns_mode"))
+                && AD_DNS.equals(Settings.Global.getString(cr, "private_dns_specifier"));
+    }
+
+    private String adBlockLabel() {
+        boolean granted = checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") == PackageManager.PERMISSION_GRANTED;
+        return adBlockOn() ? "On" : granted ? "Off" : "Off · no access";
+    }
+
+    private void toggleAdBlock() {
+        android.content.ContentResolver cr = getContentResolver();
+        try {
+            if (adBlockOn()) {
+                Settings.Global.putString(cr, "private_dns_mode", "opportunistic"); // Android's default
+            } else {
+                Settings.Global.putString(cr, "private_dns_specifier", AD_DNS);
+                Settings.Global.putString(cr, "private_dns_mode", "hostname");
+            }
+        } catch (SecurityException e) {
+            android.widget.Toast.makeText(this, "Reinstall the launcher to grant ad-block access", android.widget.Toast.LENGTH_LONG).show();
+        }
+    }
+
     // ---------------------------------------------------------------- Home Settings panel
 
     /** A tvOS-style side panel of on/off settings; OK changes the focused one. */
@@ -1504,6 +2006,13 @@ public class MainActivity extends Activity {
         int[] mins = {5, 10, 30, 60, 0};
         String[] shelfNames = {"Light", "Medium", "Dark"};
         List<View> rows = new ArrayList<>();
+        String[] looks = {"Apple TV", "Minimal dock", "Minimal list"};
+        rows.add(settingRow("Look", () -> looks[Math.max(0, Math.min(2, look()))], () -> {
+            prefs.edit().putInt("look", (look() + 1) % 3).apply();
+            lastFocusedId = View.NO_ID;
+            buildApps();
+        }));
+        rows.add(settingRow("Theme", this::themeName, this::cycleTheme));
         rows.add(settingRow("Clock & greeting", () -> pref("clock", true) ? "On" : "Off", () -> {
             prefs.edit().putBoolean("clock", !pref("clock", true)).apply();
             applyLook();
@@ -1514,7 +2023,8 @@ public class MainActivity extends Activity {
         }));
         rows.add(settingRow("Switch to HDMI when a device turns on", () -> pref("auto_hdmi", true) ? "On" : "Off", () ->
                 prefs.edit().putBoolean("auto_hdmi", !pref("auto_hdmi", true)).apply()));
-        rows.add(settingRow("Change wallpaper", () -> {
+        rows.add(settingRow("Block ads", this::adBlockLabel, this::toggleAdBlock));
+        rows.add(photoRow("Change wallpaper", () -> {
             int m = prefs.getInt("wall_min", 10);
             return m == 0 ? "Never" : m == 60 ? "Every hour" : "Every " + m + " min";
         }, () -> {
@@ -1525,7 +2035,7 @@ public class MainActivity extends Activity {
             handler.removeCallbacks(rotateWallpaper);
             if (next > 0) scheduleWallpaper(next * 60_000L);
         }));
-        rows.add(settingRow("Wallpapers", () -> {
+        rows.add(photoRow("Wallpapers", () -> {
             int m = Wallpapers.mode(this), mine = Wallpapers.mine().size();
             return m == Wallpapers.BUILT_IN ? "Built-in" : (m == Wallpapers.MINE ? "My photos" : "Built-in + mine") + " (" + mine + ")";
         }, () -> {
@@ -1533,21 +2043,18 @@ public class MainActivity extends Activity {
             wallIndex = -1;
             nextWallpaper();
         }));
-        rows.add(settingRow("Next wallpaper", () -> "", this::nextWallpaper));
+        rows.add(photoRow("Next wallpaper", () -> "", this::nextWallpaper));
         rows.add(settingRow("When the TV turns on", this::startTargetLabel, this::cycleStartTarget));
         rows.add(settingRow("App lock PIN", () -> hasPin() ? "Change" : "Not set", () -> {
             if (hasPin()) verifyPin("Enter current PIN", () -> choosePin(null));
             else choosePin(null);
         }));
-        rows.add(settingRow("Preview screensaver", () -> "", () -> {
-            Intent dream = new Intent().setClassName("com.android.systemui", "com.android.systemui.Somnambulator");
-            if (!launch(dream)) launch(new Intent(Settings.ACTION_DREAM_SETTINGS));
-        }));
-        rows.add(settingRow("Shelf", () -> shelfNames[Math.max(0, Math.min(2, prefs.getInt("shelf", 1)))], () -> {
+        rows.add(settingRow("Screensaver", () -> "", this::startScreensaver));
+        rows.add(photoRow("Shelf", () -> shelfNames[Math.max(0, Math.min(2, prefs.getInt("shelf", 1)))], () -> {
             prefs.edit().putInt("shelf", (prefs.getInt("shelf", 1) + 1) % 3).apply();
             applyLook();
         }));
-        rows.add(settingRow("Free up memory (force stop apps)",
+        rows.add(settingRow("Free up memory",
                 () -> CleanerService.isEnabled(this) ? memoryLabel() : "Set up", this::startCleanup));
         rows.add(settingRow("Hidden apps", () -> String.valueOf(userHidden().size()), this::showHiddenApps));
         rows.add(settingRow("Reset app order", () -> "", () -> {
@@ -1611,6 +2118,11 @@ public class MainActivity extends Activity {
         settingsPopup = pw;
         pw.showAtLocation(anchor, Gravity.END | Gravity.TOP, 0, 0);
         focus.requestFocus();
+    }
+
+    /** A setting that only shows on the photo (Photo and Dim themes); on Dark/Light it says so and does nothing. */
+    private View photoRow(String label, java.util.function.Supplier<String> value, Runnable action) {
+        return settingRow(label, () -> photoTheme() ? value.get() : "Photo themes only", () -> { if (photoTheme()) action.run(); });
     }
 
     /** Label on the left, current value on the right; OK runs the action and refreshes the value. */

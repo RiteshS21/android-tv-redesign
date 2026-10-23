@@ -55,6 +55,33 @@ final class Wallpapers {
         return out;
     }
 
+    // Place and photographer for each built-in photo (from WALLPAPER-CREDITS.md), shown on the screensaver.
+    private static final String[] PLACES = {
+            "Lake Louise, Canada · Chensiyuan",
+            "Austnesfjorden, Lofoten, Norway · Simo Räsänen",
+            "Baleia Franca, Santa Catarina, Brazil · Claudio Seelig",
+            "Lago do Cuniã, Rondônia, Brazil · RodrigoErse",
+            "Spullersee, Vorarlberg, Austria",
+            "Paczków, Poland · Jacek Halicki",
+            "Stromboli, Italy · Carsten Steger",
+            "Flatirons, Boulder, Colorado · Tyler Cipriani",
+            "Manneporte, Étretat, France · Jörg Braukmann",
+            "Kjeungskjær Lighthouse, Norway · Gordon Leggett",
+            "Eilean Donan Castle, Scotland · Diliff",
+            "Dzükou Valley, Nagaland, India · Samudra Bikash Hazarika",
+    };
+
+    /** "Place · Photographer" for a built-in photo (assets/wallpapers/NN.jpg), else null. */
+    static String caption(String src) {
+        if (!src.startsWith("asset:wallpapers/")) return null;
+        try {
+            int n = Integer.parseInt(src.substring(17, 19));
+            return n >= 1 && n <= PLACES.length ? PLACES[n - 1] : null;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
     /** Decode for a screen of about maxW x maxH: downsampled, RGB_565, and upright for phone photos. */
     static Bitmap load(Context c, String src, int maxW, int maxH) {
         try {

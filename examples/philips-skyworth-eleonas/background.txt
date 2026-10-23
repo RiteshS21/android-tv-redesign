@@ -1,0 +1,12 @@
+# Apps not allowed to run in the background (they still open and work normally when you pick them).
+# Apply: grep -vE '^\s*(#|$)' examples/philips-skyworth-eleonas/background.txt | awk '{print "cmd appops set " $1 " RUN_ANY_IN_BACKGROUND ignore"}' | tools/venv/bin/python -I tools/tv.py --batch
+# Undo:  same, with "allow" instead of "ignore".
+# Left alone on purpose: ProtonVPN (a VPN must run in the background), Netflix, YouTube, Stremio, CloudStream, YouTube Music.
+com.jio.web.androidtv          # JioSphere
+com.jio.jiogamestv             # JioGames
+com.jio.jioplay.tv             # JioTV
+com.nvidia.geforcenow          # GeForce Now
+app.netmirror.newtv            # NetMirror
+app.lumoslabs.chillio          # Chillio
+com.debridmanager.tv           # Debrid Manager
+com.cxinventor.file.explorer   # Cx File Explorer

@@ -10,3 +10,6 @@ shots/
 launcher/build/
 .DS_Store
 __pycache__/
+
+# Local code graph (graphify)
+graphify-out/

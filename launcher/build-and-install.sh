@@ -23,7 +23,7 @@ if [ -n "${OVERLAY:-}" ]; then
   OVERLAY_ARGS=(-R "$B/overlay.zip")
 fi
 "$BT/aapt2" link -o "$B/base.apk" -I "$JAR" --manifest AndroidManifest.xml --java "$B/gen" \
-  -A assets --min-sdk-version 30 --target-sdk-version 30 "$B/res.zip" ${OVERLAY_ARGS[@]+"${OVERLAY_ARGS[@]}"}
+  -A assets --min-sdk-version 30 --target-sdk-version 34 "$B/res.zip" ${OVERLAY_ARGS[@]+"${OVERLAY_ARGS[@]}"}
 javac -encoding UTF-8 -nowarn -Xlint:-options --release 11 -classpath "$JAR" -d "$B/classes" \
   $(find src "$B/gen" -name '*.java')
 "$BT/d8" --min-api 30 --lib "$JAR" --output "$B/dex" $(find "$B/classes" -name '*.class')
@@ -47,6 +47,9 @@ printf '%s\n' \
   "pm grant com.mihir.tvhome android.permission.ACCESS_FINE_LOCATION" \
   "appops set com.mihir.tvhome GET_USAGE_STATS allow" \
   "pm grant com.mihir.tvhome android.permission.READ_EXTERNAL_STORAGE" \
+  "pm grant com.mihir.tvhome android.permission.READ_MEDIA_IMAGES" \
+  "pm grant com.mihir.tvhome android.permission.WRITE_SECURE_SETTINGS" \
+  "cmd notification allow_listener com.mihir.tvhome/com.mihir.tvhome.MediaListener" \
   "mkdir -p /sdcard/Pictures/Wallpapers" \
   "settings put secure screensaver_components com.mihir.tvhome/.AerialDream" \
   "cmd package set-home-activity --user 0 com.mihir.tvhome/.MainActivity" \

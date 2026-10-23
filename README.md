@@ -77,8 +77,18 @@ Undo everything with `tools\restore.ps1 <debloat list>` (add `-RemoveLauncher` t
 Laid out like tvOS: the photo fills the top half, the dock sits in a rounded glass tray, the rest of
 your apps follow in rows of wide icons over a frosted blur. Focus lifts an icon with a light sweep.
 
-- **Top-left**: greeting, clock and date. **Top-right**: a glass capsule with **Search** (Google
-  Assistant), **Inputs** (HDMI/AV/Live TV), **Wi-Fi** and **Settings**.
+- **Top-left**: greeting, clock and date, and a **now-playing card** (art, title, play/pause, skip) while
+  an app is playing. **Top-right**: a glass capsule with **Search** (Google Assistant), **Inputs**
+  (HDMI/AV/Live TV), **Wi-Fi**, **Controls** and **Settings**.
+- **Looks** (Home Settings › Look): **Apple TV** (the wide icons above), **Minimal dock** and **Minimal
+  list**, quiet CleanFrame-style layouts with white app logos and names (apps without a one-colour
+  logo show their icon in grey).
+- **Themes** (Home Settings › Theme, or Control Center): **Photo**, **Dim** (darkened photo, also dims
+  the screensaver), **Dark** and **Light** (plain backgrounds; the apps move up into the photo's space).
+- **Control Center** (the Controls button): play/pause, Sleep and a sleep timer, sound output, VPN,
+  Block ads, Inputs, Screensaver, Free up memory, Theme and a shortcut to Home Settings.
+- **Block ads**: switches the TV's Private DNS to AdGuard DNS, which blocks ad and tracker domains for
+  every app. Off puts it back to automatic.
 - **Long-press OK on an app**: Move (arrow keys, OK to finish; drag in or out of the dock), Add to /
   Remove from Dock, App info, Hide, Lock with PIN, Uninstall. The layout is remembered on the TV.
 - **Recently used** row (needs usage access, granted at install) and **Home Settings** at the bottom:
@@ -89,11 +99,35 @@ your apps follow in rows of wide icons over a frosted blur. Focus lifts an icon 
   stop on each app's App info page. Switch on *Home: Free up memory* once in Settings › Accessibility.
   The service is limited to the Settings app (it never sees other apps' screens), only acts during a
   clean-up you start, and the launcher has no internet permission.
-- **Aerial screensaver**: the photos drift slowly with a large clock; set as the TV's screensaver at install.
+- **Aerial screensaver**: the photos drift slowly with a large clock, the place name and what's
+  playing; set as the TV's screensaver at install.
 - 12 nature photos (`launcher/assets/wallpapers/`, credits in `launcher/WALLPAPER-CREDITS.md`).
+
+See [Looks and themes](#looks-and-themes-before-and-after) for screenshots.
 
 The default dock comes from `config.xml`; once you rearrange apps on the TV, that layout wins
 (Home Settings › Reset app order goes back). App lock only applies to apps opened from this launcher.
+
+## Looks and themes: before and after
+
+Screenshots from a Philips (Skyworth) Android 14 TV, before and after a round of fixes from testing
+every look in every theme.
+
+| | Before | After |
+|---|---|---|
+| **Minimal list, Photo**: every app has an icon, no dark boxes behind names, the selected app shows after Home, a shade keeps names readable, "All apps" splits your dock apps from the rest | ![](docs/screenshots/before-list-photo-home.jpg) | ![](docs/screenshots/after-list-photo-home.jpg) |
+| **Minimal dock, Photo**: grey icons share one rounded shape, small logos (CloudStream) fill their space, no hard blur line | ![](docs/screenshots/before-dock-photo-bottom.jpg) | ![](docs/screenshots/after-dock-photo-bottom.jpg) |
+| **Apple TV, Dim**: the dock's glass dims with the photo instead of standing out as a grey band | ![](docs/screenshots/before-tv-dim-home.jpg) | ![](docs/screenshots/after-tv-dim-home.jpg) |
+| **Apple TV, Dark**: apps move up into the empty photo area, tiles get a faint outline, the tray is a quiet panel | ![](docs/screenshots/before-tv-dark-home.jpg) | ![](docs/screenshots/after-tv-dark-home.jpg) |
+| **Minimal dock, Dark**: the dock moves up and the rest of your apps show below it | ![](docs/screenshots/before-dock-dark-home.jpg) | ![](docs/screenshots/after-dock-dark-home.jpg) |
+| **Control Center**: Theme and Home Settings rows | ![](docs/screenshots/before-list-photo-cc.jpg) | ![](docs/screenshots/after-list-photo-cc.jpg) |
+| **Home Settings, Dark**: wallpaper rows say they only apply to the photo themes | ![](docs/screenshots/before-list-dark-settings.jpg) | ![](docs/screenshots/after-list-dark-settings.jpg) |
+
+New **Light** theme, in each look:
+
+| Minimal list | Apple TV | Minimal dock |
+|---|---|---|
+| ![](docs/screenshots/after-list-light-home.jpg) | ![](docs/screenshots/after-tv-light-home.jpg) | ![](docs/screenshots/after-dock-light-home.jpg) |
 
 ## Gotchas we hit
 
@@ -120,7 +154,7 @@ The default dock comes from `config.xml`; once you rearrange apps on the TV, tha
 
 Android TV and Google TV: TCL, Xiaomi/Redmi, Hisense, Sony, OnePlus, Realme, Nvidia Shield,
 Chromecast with Google TV and most others. Not Samsung (Tizen), LG (webOS) or Fire TV.
-Tested on: TCL Google TV (Android 11). Add yours to `examples/`.
+Tested on: TCL Google TV (Android 11), Vu Google TV, Philips Smart 4K TV (Skyworth, Android 14). Add yours to `examples/`.
 
 ## Credits
 

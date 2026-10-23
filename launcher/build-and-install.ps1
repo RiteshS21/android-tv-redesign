@@ -33,7 +33,7 @@ if ($Overlay) {
   $overlayArgs = @('-R', "$B\overlay.zip")
 }
 Run "$BT\aapt2.exe" link -o "$B\base.apk" -I $JAR --manifest AndroidManifest.xml --java "$B\gen" `
-  -A assets --min-sdk-version 30 --target-sdk-version 30 "$B\res.zip" @overlayArgs
+  -A assets --min-sdk-version 30 --target-sdk-version 34 "$B\res.zip" @overlayArgs
 $sources = Get-ChildItem src, "$B\gen" -Recurse -Filter *.java | ForEach-Object FullName
 Run javac -encoding UTF-8 -nowarn '-Xlint:-options' --release 11 -classpath $JAR -d "$B\classes" @sources
 $classes = Get-ChildItem "$B\classes" -Recurse -Filter *.class | ForEach-Object FullName
@@ -59,6 +59,9 @@ if (-not ($installed -match '^Success')) { throw "pm install failed; stock launc
   "pm grant com.mihir.tvhome android.permission.ACCESS_FINE_LOCATION"
   "appops set com.mihir.tvhome GET_USAGE_STATS allow"
   "pm grant com.mihir.tvhome android.permission.READ_EXTERNAL_STORAGE"
+  "pm grant com.mihir.tvhome android.permission.READ_MEDIA_IMAGES"
+  "pm grant com.mihir.tvhome android.permission.WRITE_SECURE_SETTINGS"
+  "cmd notification allow_listener com.mihir.tvhome/com.mihir.tvhome.MediaListener"
   "mkdir -p /sdcard/Pictures/Wallpapers"
   "settings put secure screensaver_components com.mihir.tvhome/.AerialDream"
   "cmd package set-home-activity --user 0 com.mihir.tvhome/.MainActivity"

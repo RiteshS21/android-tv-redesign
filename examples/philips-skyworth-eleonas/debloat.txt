@@ -1,0 +1,42 @@
+# Philips Smart 4K TV (Skyworth-made, device eleonas), Google TV, Android 14, build UKN5.251016.083
+# Apply: tools/disable.sh examples/philips-skyworth-eleonas/debloat.txt   Undo: tools/restore.sh <same file>
+# Everything is DISABLED for user 0, never uninstalled.
+# Owner uses: Chromecast/DIAL casting, USB media, YouTube Music, firmware updates (kept enabled).
+# Not listed on purpose: the stock launcher and setupwraith (the launcher install script handles them),
+# com.smartdevice.bleconnectservice (remote pairing), global.service / factory (core), all user-installed apps.
+
+# Skyworth (smartdevice) ads, recommendations and telemetry
+com.smartdevice.recommendation               # promo / recommendation rows
+com.smartdevice.leanbacklauncher.customizer  # partner rows and promos in the stock launcher
+com.smartdevice.aftersale                    # after-sales service reporting
+com.smartdevice.recordactivation             # activation / usage reporting
+com.Smartdevice.emanual                      # e-manual
+
+# Google extras
+com.google.android.feedback                  # feedback reporter
+com.android.tv.feedbackconsent               # feedback consent prompts
+com.google.android.play.games                # Play Games
+com.google.android.apps.tv.dreamx            # ambient screensaver with recommendations (the new launcher sets its own)
+
+# Interactive broadcast TV for other regions
+org.obs.mhegservice                          # MHEG-5 (UK/NZ broadcast interactive)
+tv.mopa.ginga                                # Ginga (Brazil broadcast interactive)
+
+# Skyworth extras the owner doesn't use
+com.smartdevice.dailymanage                  # Skyworth "daily manage" / cleaner
+com.smartdevice.dailyshortcut                # Art Time ambient art mode
+com.smartdevice.dtv.icast                    # iCast screen mirroring from phone
+com.smartdevice.duplebluetooth               # two Bluetooth headphones at once
+
+# Kept on purpose: com.cltv.hybrid is also the HDMI input app (hide it in the launcher instead),
+# mediashell + mediatek.dialservice (casting), tianci.localmedia (USB), youtube.tvmusic, systemupdater.
+
+# Round 2: unused system services and the old launcher
+com.wolf.lm                                  # Wolf Launcher (replaced by the new home screen)
+com.mediatek.dtv.tvinput.dvbtuner            # antenna/cable tuner; HDMI inputs come from com.mediatek.tis
+com.android.printspooler                     # printing
+com.android.hotwordenrollment.okgoogle       # "OK Google" hotword setup (remote mic search doesn't use it)
+com.android.hotwordenrollment.xgoogle
+com.google.android.syncadapters.calendar     # Google Calendar sync
+com.android.healthconnect.controller         # Health Connect
+com.android.health.connect.backuprestore

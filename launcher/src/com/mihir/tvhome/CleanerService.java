@@ -77,6 +77,31 @@ public class CleanerService extends AccessibilityService {
         }
     }
 
+    // Control Center's Sleep: the lock-screen global action puts a TV into standby. Needs no screen access.
+    private static long sleepAt;
+    private final Runnable sleepNow = () -> { sleepAt = 0; performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN); };
+
+    /** Standby now. False if the service isn't on. */
+    static boolean sleep() {
+        return instance != null && instance.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN);
+    }
+
+    /** Standby in {@code ms}, or cancel with 0. False if the service isn't on. */
+    // shortcut: the timer lives in this service, so it is lost if Android restarts it; use AlarmManager if that bites.
+    static boolean sleepIn(long ms) {
+        CleanerService s = instance;
+        if (s == null) return false;
+        s.handler.removeCallbacks(s.sleepNow);
+        sleepAt = ms > 0 ? System.currentTimeMillis() + ms : 0;
+        if (ms > 0) s.handler.postDelayed(s.sleepNow, ms);
+        return true;
+    }
+
+    /** Wall-clock time the sleep timer fires, or 0. */
+    static long sleepAt() {
+        return instance == null ? 0 : sleepAt;
+    }
+
     @Override protected void onServiceConnected() { instance = this; }
 
     @Override public boolean onUnbind(Intent intent) {
