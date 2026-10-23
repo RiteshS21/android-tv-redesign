@@ -103,25 +103,24 @@ your apps follow in rows of wide icons over a frosted blur. Focus lifts an icon 
   playing; set as the TV's screensaver at install.
 - 12 nature photos (`launcher/assets/wallpapers/`, credits in `launcher/WALLPAPER-CREDITS.md`).
 
-See [Looks and themes](#looks-and-themes-before-and-after) for screenshots.
+See [Looks and themes](#looks-and-themes) for screenshots.
 
 The default dock comes from `config.xml`; once you rearrange apps on the TV, that layout wins
 (Home Settings › Reset app order goes back). App lock only applies to apps opened from this launcher.
 
-## Looks and themes: before and after
+## Looks and themes
 
-Screenshots from a Philips (Skyworth) Android 14 TV, before and after a round of fixes from testing
-every look in every theme.
+Screenshots from a Philips (Skyworth) Android 14 TV, after testing every look in every theme.
 
-| | Before | After |
-|---|---|---|
-| **Minimal list, Photo**: every app has an icon, no dark boxes behind names, the selected app shows after Home, a shade keeps names readable, "All apps" splits your dock apps from the rest | ![](docs/screenshots/before-list-photo-home.jpg) | ![](docs/screenshots/after-list-photo-home.jpg) |
-| **Minimal dock, Photo**: grey icons share one rounded shape, small logos (CloudStream) fill their space, no hard blur line | ![](docs/screenshots/before-dock-photo-bottom.jpg) | ![](docs/screenshots/after-dock-photo-bottom.jpg) |
-| **Apple TV, Dim**: the dock's glass dims with the photo instead of standing out as a grey band | ![](docs/screenshots/before-tv-dim-home.jpg) | ![](docs/screenshots/after-tv-dim-home.jpg) |
-| **Apple TV, Dark**: apps move up into the empty photo area, tiles get a faint outline, the tray is a quiet panel | ![](docs/screenshots/before-tv-dark-home.jpg) | ![](docs/screenshots/after-tv-dark-home.jpg) |
-| **Minimal dock, Dark**: the dock moves up and the rest of your apps show below it | ![](docs/screenshots/before-dock-dark-home.jpg) | ![](docs/screenshots/after-dock-dark-home.jpg) |
-| **Control Center**: Theme and Home Settings rows | ![](docs/screenshots/before-list-photo-cc.jpg) | ![](docs/screenshots/after-list-photo-cc.jpg) |
-| **Home Settings, Dark**: wallpaper rows say they only apply to the photo themes | ![](docs/screenshots/before-list-dark-settings.jpg) | ![](docs/screenshots/after-list-dark-settings.jpg) |
+| | After |
+|---|---|
+| **Minimal list, Photo**: every app has an icon, no dark boxes behind names, the selected app shows after Home, a shade keeps names readable, "All apps" splits your dock apps from the rest | ![](docs/screenshots/after-list-photo-home.jpg) |
+| **Minimal dock, Photo**: grey icons share one rounded shape, small logos (CloudStream) fill their space, no hard blur line | ![](docs/screenshots/after-dock-photo-bottom.jpg) |
+| **Apple TV, Dim**: the dock's glass dims with the photo instead of standing out as a grey band | ![](docs/screenshots/after-tv-dim-home.jpg) |
+| **Apple TV, Dark**: apps move up into the empty photo area, tiles get a faint outline, the tray is a quiet panel | ![](docs/screenshots/after-tv-dark-home.jpg) |
+| **Minimal dock, Dark**: the dock moves up and the rest of your apps show below it | ![](docs/screenshots/after-dock-dark-home.jpg) |
+| **Control Center**: Theme and Home Settings rows | ![](docs/screenshots/after-list-photo-cc.jpg) |
+| **Home Settings, Dark**: wallpaper rows say they only apply to the photo themes | ![](docs/screenshots/after-list-dark-settings.jpg) |
 
 New **Light** theme, in each look:
 

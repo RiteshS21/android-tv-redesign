@@ -17,5 +17,5 @@ Google TV also disable com.google.android.tungsten.setupwraith or it hijacks the
 test the Home button from inside an app.
 ```
 
-If you cloned [this repo](https://github.com/mihirgupta0900/tv-home), run Claude Code inside it. It
+If you cloned [this repo](https://github.com/RiteshS21/android-tv-redesign), run Claude Code inside it. It
 can reuse the launcher and scripts instead of writing them from scratch.
