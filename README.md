@@ -156,6 +156,7 @@ Tested on: TCL Google TV (Android 11), Vu Google TV, Philips Smart 4K TV (Skywor
 
 ## Credits
 
-Inspired by [Gathin23/tv-vibehack](https://github.com/Gathin23/tv-vibehack). Wallpaper photos are
+Forked from [VirajP4595/tv-home](https://github.com/VirajP4595/tv-home). Inspired by
+[Gathin23/tv-vibehack](https://github.com/Gathin23/tv-vibehack). Wallpaper photos are
 from Wikimedia Commons under their own licences, see
 [launcher/WALLPAPER-CREDITS.md](launcher/WALLPAPER-CREDITS.md). Code is MIT, see [LICENSE](LICENSE).
